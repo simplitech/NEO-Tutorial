@@ -9,13 +9,14 @@ This model is used for both the persistence and the network layer.
 ### Integer serialization
 Integers are encoded using a variable length according to the value stored:
 
-|Value|Length|Format|
+|Value of the Integer|Consumed bytes|Format|
 |---|---|---|
-|< 0xfd|1|uint8|
-|<= 0xffff|3|0xfd + uint16|
-|<= 0xffffffff|5|0xfe + uint32|
-|> 0xffffffff|9|0xff + uint64|
+|less than 253|1|uint8|
+|less than 65536|3|253 + uint16|
+|less than 4294967296|5|254 + uint32|
+|other values|9|255 + uint64|
 
+#### Examples
 The value 1 is stored using a single byte:
 
 ![single_byte](persistence_1_byte.png)
@@ -57,18 +58,19 @@ public static void WriteVarInt(this BinaryWriter writer, long value)
 ```
 
 #### Byte order
-All variable length integer of NEO are little endian except for IP address and port number.
+All integer variable length of NEO are little endian except for IP address and port number.
 
 ### String serialization
-Strings are encoded using variable length strings, consisting of variable length integer followed by the string encoded in UTF8.
+Strings are encoded using string variable length, consisting of integer variable length followed by the string encoded in UTF8.
 
-|Size|Field|Type|Description|
+||Size|Type|Description|
 |---|---|---|---|
-|?|length|integer|The length of a string in bytes|
-|length|string|uint8[length]|string itself|
+|**Length**|Any length|integer|The length of a string in bytes|
+|**String**|exactly the same described on 'length'|uint8[length]|The string itself|
 
 You can find [here](http://www.unicode.org/versions/Unicode9.0.0/ch03.pdf#page=54)  additional information on how UTF-8 is serialized.
 
+#### Example
 The string "NEO" is stored using 4 bytes:
 ![var_string](persistence_var_string.png)
 
@@ -112,6 +114,7 @@ Both UInt160 and UInt256 are stored as fixed size byte arrays, using 20 and 32 b
 NEO uses RIPMED160 for script-hashes and SHA256 for transaction and block hashes.  
 Note that in NEO we use hash functions twice. The first hash is always SHA256.
 
+#### Contract hash example
 A very common use for UInt160 are contract hashes:
 ![contract](persistence_contract.png)
 
@@ -146,7 +149,7 @@ public byte[] Hash160(byte[] message)
 }
 ```
 
-#### Address
+#### Address example
 UInt160 is used for contract hashes and the resulting hash is used to build the address.  
 The address is the script-hash of the contract, encoded in Bas58 prefixed with the contract version, currently `0x23`.
 
@@ -205,18 +208,18 @@ At network level, nodes request for the block header and transactions separately
 
 Serializable data structure of block header:
 
-|Size|Field|DataType|Description|
+||Size|DataType|Description|
 |---|---|---|---|
-|4|Version|uint32|Version of the block which is 0 for now|
-|32|PrevBlock|uint256|Hash value of the previous block|
-|32|MerkleRoot|uint256|Root hash of a transaction list|
-|4|Timestamp|uint32|Time-stamp|
-|4|Height|uint32|Height of block|
-|8|Nonce|uint64|Random number|
-|20|NextMiner|uint160|Contract address of next miner|
-|1|-|uint8|It's fixed to 1|
-|?|Script|script|Script used to validate the block|
-|1|-|uint8|It's fixed to 0|
+|**Version**|4|uint32|Version of the block which is 0 for now|
+|**PrevBlock**|32|uint256|Hash value of the previous block|
+|**MerkleRoot**|32|uint256|Root hash of a transaction list|
+|**Timestamp**|4|uint32|Time-stamp|
+|**Height**|4|uint32|Height of block|
+|**Nonce**|8|uint64|Random number|
+|**NextMiner**|20|uint160|Contract address of next miner|
+|**Separator**|1|uint8|It's fixed to 1|
+|**Script**|Any length|byte[]|Script used to validate the block|
+|**Delimiter**|1|uint8|It's fixed to 0|
 
 #### Block
 The block is composed by properties from the block header and an array of transactions, with at least one transaction (Miner Transaction).
@@ -225,18 +228,18 @@ The block is composed by properties from the block header and an array of transa
 
 Serializable data structure of the block:
 
-|Size|Field|DataType|Description|
+||Size|DataType|Description|
 |---|---|---|---|
-|4|Version|uint32|Version of the block which is 0 for now|
-|32|PrevBlock|uint256|Hash value of the previous block|
-|32|MerkleRoot|uint256|Root hash of a transaction list|
-|4|Timestamp|uint32|Time-stamp|
-|4|Height|uint32|Height of block|
-|8|Nonce|uint64|Random number|
-|20|NextMiner|uint160|Contract address of next miner|
-|1|-|uint8|It's fixed to 1|
-|?|Script|script|Script used to validate the block|
-|?*?|Transactions|tx[]|Transactions list|
+|**Version**|4|uint32|Version of the block which is 0 for now|
+|**PrevBlock**|32|uint256|Hash value of the previous block|
+|**MerkleRoot**|32|uint256|Root hash of a transaction list|
+|**Timestamp**|4|uint32|Time-stamp|
+|**Height**|4|uint32|Height of block|
+|**Nonce**|8|uint64|Random number|
+|**NextMiner**|20|uint160|Contract address of next miner|
+|**Separator**|1|uint8|It's fixed to 1|
+|**Script**|Any length|byte[]|Script used to validate the block|
+|**Transactions**|Any length|tx[]|Transactions list|
 
 
 #### (Native) Asset
@@ -466,9 +469,9 @@ The `MinerTransaction` has one attribute called `nonce` used to avoid hash colli
 
 Miner Transaction special attributes:
 
-|Size|Field|DataType|Description|
+||Size|DataType|Description|
 |---|---|---|---|
-|4|Nonce|uint32|random number|
+|**Nonce**|4|uint32|random number|
 
 
 #### Witnesses
@@ -478,15 +481,15 @@ Miner Transaction special attributes:
 Transactions are the inputs used in our ledger. They can me used to claim GAS, transfer native assets and perform actions in the blockchain.
 The serialization of a transaction varies depending on the action to be registered in the ledger.
 
-|Size|Field|DataType|Description|
+||Size|DataType|Description|
 |---|---|---|---|
-|1|Type|uint8|Type of transaction|
-|1|Version|uint8|Trading version, currently 0|
-|?|-|-|Data specific to transaction types|
-|?*?|Attributes|tx_attr[]|Additional features that the transaction has|
-|34*?|Inputs|tx_in[]|Input|
-|60*?|Outputs|tx_out[]|Output|
-|?*?|Scripts|script[]|List of scripts used to validate the transaction|
+|**Type**|1|uint8|Type of transaction|
+|**Version**|1|uint8|Trading version, currently 0|
+|**Ignore**|Any length|-|Data specific to transaction types|
+|**Attributes**|Any length|tx_attr[]|Additional features that the transaction has|
+|**Inputs**|Any length|tx_in[]|Input|
+|**Outputs**|Any length|tx_out[]|Output|
+|**Scripts**|Any length|script[]|List of scripts used to validate the transaction|
 
 ##### Contract Transaction
 Contract transactions have Type `0x80`. The verification script used is usually a 64 bytes signatures.
